@@ -1,6 +1,8 @@
 #[starknet::contract]
 mod AccountWithMulticall {
-    use array::{ArrayTrait, ArraySerde, SpanTrait};
+    use core::starknet::SyscallResultTrait;
+    // use array::{ArrayTrait, ArraySerde, SpanTrait};
+    // use array::ArrayTCloneImpl;
     
     use box::BoxTrait;
     use ecdsa::check_ecdsa_signature;
@@ -45,7 +47,45 @@ mod AccountWithMulticall {
     }
 
     #[external(v0)]
-    impl ISRC6Impl of ISRC6<ContractState> {
+    impl ISRC6Impl of starknet::account::AccountContract<ContractState> {
+
+        fn __validate_declare__(self: @ContractState, class_hash: felt252) -> felt252 {
+            self.validate_transaction()
+        }
+        // validate contract execution
+        fn __validate__(ref self: ContractState, calls: Array<Call>) -> felt252 {
+            self.validate_transaction()
+        }
+
+        // execute a contract call
+        fn __execute__(ref self: ContractState, mut calls: Array<Call>) -> Array<Span<felt252>> {
+            // Validate caller
+            assert(starknet::get_caller_address().is_zero(), 'INVALID_CALLER');
+
+            let tx_info = starknet::get_tx_info().unbox();
+            assert(tx_info.version != 0, 'INVALID_TX_VERSION');
+
+            let mut result : Array<Span<felt252>> = ArrayTrait::new();
+            loop {
+                match calls.pop_front() {
+                    Option::Some(call) => {
+                        let res = call_contract_syscall(
+                            address: call.to,
+                            entry_point_selector: call.selector,
+                            calldata: call.calldata.span()
+                        ).unwrap_syscall();
+
+                        // ArrayTCloneImpl::clone(res)
+
+                        result.append(res);
+                    },
+                    Option::None(()) => {
+                        break; // Can't break result; because of 'variable was previously moved'
+                    },
+                };
+            };
+            result
+        }
 
         
     }
