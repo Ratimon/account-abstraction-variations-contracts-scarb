@@ -12,6 +12,7 @@ mod AccountWithMulticall {
     use zeroable::Zeroable;
 
     use account_abstraction_variations::accounts::interface::ISRC6;
+    use account_abstraction_variations::accounts::interface::IAccountAddon;
 
     #[storage]
     struct Storage {
@@ -44,16 +45,40 @@ mod AccountWithMulticall {
 
             starknet::VALIDATED
         }
+
+        fn is_valid_signature_bool(self: @ContractState, hash: felt252, signature: Array<felt252>) -> bool {
+            let is_valid_length = signature.len() == 2_u32;
+
+            if !is_valid_length {
+                return false;
+            }
+            
+            check_ecdsa_signature(
+                hash, self.public_key.read(), *signature.at(0_u32), *signature.at(1_u32)
+            )
+        }
     }
 
     #[external(v0)]
-    impl ISRC6Impl of starknet::account::AccountContract<ContractState> {
+    impl IAccountAddonImpl of IAccountAddon<ContractState> {
 
         fn __validate_declare__(self: @ContractState, class_hash: felt252) -> felt252 {
             self.validate_transaction()
         }
-        // validate contract execution
-        fn __validate__(ref self: ContractState, calls: Array<Call>) -> felt252 {
+
+        fn __validate_deploy__(self: @ContractState, class_hash: felt252,contract_address_salt: felt252,public_key_: felt252) -> felt252 {
+            self.validate_transaction()
+        }
+
+        fn public_key(self: @ContractState) -> felt252 {
+            self.public_key.read()
+        }
+    }
+
+    #[external(v0)]
+    impl ISRC6Impl of ISRC6<ContractState> {
+
+        fn __validate__(self: @ContractState, calls: Array<Call>) -> felt252 {
             self.validate_transaction()
         }
 
@@ -87,9 +112,11 @@ mod AccountWithMulticall {
             result
         }
 
+        fn is_valid_signature(self: @ContractState, hash: felt252, signature: Array<felt252>) -> felt252 {
+            let is_valid = self.is_valid_signature_bool(hash, signature);
+            if is_valid { 'VALID' } else { 0 }
+        }
         
     }
-
-
 
 }
