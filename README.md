@@ -1,4 +1,4 @@
-# ERC20 variations
+# Account Abstraction variations
 
 ## Installation
 
